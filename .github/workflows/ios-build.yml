@@ -1,0 +1,78 @@
+name: Build iPhone IPA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Zhixu/**'
+      - 'Zhixu.xcodeproj/**'
+      - 'scripts/**'
+      - '.github/workflows/ios-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Compile and package unsigned IPA
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Show Xcode environment
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+      - name: Build iPhone application
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          xcodebuild -project Zhixu.xcodeproj -scheme Zhixu \
+            -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            build 2>&1 | tee artifacts/device-build.log
+      - name: Package unsigned IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p staging/Payload
+          cp -R build/Build/Products/Release-iphoneos/Zhixu.app staging/Payload/
+          test -f staging/Payload/Zhixu.app/Zhixu
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' staging/Payload/Zhixu.app/Info.plist
+          (cd staging && zip -qry ../artifacts/Zhixu-unsigned.ipa Payload)
+          shasum -a 256 artifacts/Zhixu-unsigned.ipa > artifacts/SHA256.txt
+          printf '%s\n' 'This IPA is unsigned. Sign it for your device before installation.' > artifacts/READ-ME.txt
+      - name: Simulator smoke check
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -project Zhixu.xcodeproj -scheme Zhixu \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath simulator-build CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | tee artifacts/simulator-build.log
+          simulator_id=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for group in d["devices"].values() for x in group if "iPhone" in x["name"]))')
+          xcrun simctl boot "$simulator_id"
+          xcrun simctl bootstatus "$simulator_id" -b
+          xcrun simctl install "$simulator_id" simulator-build/Build/Products/Debug-iphonesimulator/Zhixu.app
+          xcrun simctl launch "$simulator_id" com.manyu2006131.zhixu | tee artifacts/simulator-launch.log
+          xcrun simctl shutdown "$simulator_id"
+      - name: Upload IPA and logs
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: Zhixu-iPhone-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
