@@ -7,6 +7,7 @@ on:
       - 'Zhixu/**'
       - 'Zhixu.xcodeproj/**'
       - 'scripts/**'
+      - 'tests/**'
       - '.github/workflows/ios-build.yml'
   workflow_dispatch:
 
@@ -21,7 +22,7 @@ jobs:
   build:
     name: Compile and package unsigned IPA
     runs-on: macos-15
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
@@ -31,6 +32,8 @@ jobs:
         run: |
           xcodebuild -version
           xcodebuild -showsdks
+      - name: Test model compatibility
+        run: python3 scripts/test-models.py
       - name: Build iPhone application
         shell: bash
         run: |
@@ -67,6 +70,11 @@ jobs:
           xcrun simctl bootstatus "$simulator_id" -b
           xcrun simctl install "$simulator_id" simulator-build/Build/Products/Debug-iphonesimulator/Zhixu.app
           xcrun simctl launch "$simulator_id" com.manyu2006131.zhixu | tee artifacts/simulator-launch.log
+          xcrun simctl io "$simulator_id" screenshot artifacts/home.png
+          xcodebuild -project Zhixu.xcodeproj -scheme Zhixu \
+            -configuration Debug -destination "platform=iOS Simulator,id=$simulator_id" \
+            -derivedDataPath simulator-build -resultBundlePath artifacts/UITests.xcresult \
+            CODE_SIGNING_ALLOWED=NO test 2>&1 | tee artifacts/ui-tests.log
           xcrun simctl shutdown "$simulator_id"
       - name: Upload IPA and logs
         if: always()
