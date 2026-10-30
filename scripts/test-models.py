@@ -40,6 +40,9 @@ check(recovered.timerEnd != nil, "active timer lost")
 check(recovered.expenses[0].cents == 1234, "money precision changed")
 check(Review.intervals == [1,2,4,7,15,30], "review intervals changed")
 do { _ = try decoder.decode(AppData.self, from: Data("{bad}".utf8)); fatalError("bad file accepted") } catch {}
+check(progressRatio(0.25, 0.5) == 0.5, "fractional progress denominator wrong")
+check(progressRatio(5, 0) == 0, "zero total must be safe")
+check(progressRatio(30, 10) == 1, "completed goal must clamp")
 print("PASS: legacy migration, unicode, all tool types, review linkage, active timer, money precision, corrupt JSON")
 '''
 with tempfile.TemporaryDirectory() as d:

@@ -616,6 +616,10 @@ struct Extras: Codable {
     var savingsGoal: Double = 30000
     var lastBackup = Date()
 }
+func progressRatio(_ completed: Double, _ total: Double) -> Double {
+    guard completed.isFinite, total.isFinite, total > 0 else { return 0 }
+    return min(1, max(0, completed / total))
+}
 func dayKey(_ date: Date = Date()) -> String {
     let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
     return "\(c.year ?? 0)-\(c.month ?? 0)-\(c.day ?? 0)"
@@ -700,8 +704,8 @@ struct EntrySummary: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(entry.title.isEmpty ? entry.kind.rawValue : entry.title).font(.headline)
             if entry.kind == .progress {
-                ProgressView(value: min(1, entry.amount / max(1, entry.goal)))
-                Text("\(entry.amount, specifier: "%.0f") / \(entry.goal, specifier: "%.0f") · \(min(100, entry.amount / max(1, entry.goal) * 100), specifier: "%.0f")%").font(.caption).foregroundStyle(.secondary)
+                ProgressView(value: progressRatio(entry.amount, entry.goal))
+                Text("\(entry.amount, specifier: "%.0f") / \(entry.goal, specifier: "%.0f") · \(progressRatio(entry.amount, entry.goal) * 100, specifier: "%.0f")%").font(.caption).foregroundStyle(.secondary)
             } else if entry.kind == .exam {
                 let days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: Date()), to: Calendar.current.startOfDay(for: entry.date)).day ?? 0
                 Text(days > 0 ? "还有 \(days) 天" : days == 0 ? "就是今天" : "已过去 \(-days) 天").foregroundStyle(.purple).font(.title3.bold())
@@ -902,7 +906,7 @@ struct BudgetView: View {
             Section("攒钱目标") {
                 TextField("当前已攒金额", text: $saved).keyboardType(.decimalPad)
                 TextField("目标金额", text: $target).keyboardType(.decimalPad)
-                ProgressView(value: min(1, store.data.extras.savings / max(1, store.data.extras.savingsGoal)))
+                ProgressView(value: progressRatio(store.data.extras.savings, store.data.extras.savingsGoal))
                 Text("已攒 ¥\(store.data.extras.savings, specifier: "%.2f") / ¥\(store.data.extras.savingsGoal, specifier: "%.2f")").font(.caption)
                 Text("金额手动更新；记账不会自动改变储蓄。预算按每个自然月统计支出。 ").font(.footnote).foregroundStyle(.secondary)
             }

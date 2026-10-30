@@ -17,6 +17,7 @@ final class ZhixuUITests: XCTestCase {
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         title.tap(); title.typeText("UI smoke task")
         app.buttons["保存"].tap()
+        app.swipeUp()
         XCTAssertTrue(app.staticTexts["UI smoke task"].waitForExistence(timeout: 5))
         app.tabBars.buttons["花销"].tap()
         app.buttons["记一笔"].tap()

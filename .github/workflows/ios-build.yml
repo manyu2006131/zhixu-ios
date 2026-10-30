@@ -56,7 +56,7 @@ jobs:
           (cd staging && zip -qry ../artifacts/Zhixu-unsigned.ipa Payload)
           shasum -a 256 artifacts/Zhixu-unsigned.ipa > artifacts/SHA256.txt
           printf '%s\n' 'This IPA is unsigned. Sign it for your device before installation.' > artifacts/READ-ME.txt
-      - name: Simulator smoke check
+      - name: Compile simulator app
         shell: bash
         run: |
           set -euo pipefail
@@ -65,18 +65,30 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath simulator-build CODE_SIGNING_ALLOWED=NO \
             build 2>&1 | tee artifacts/simulator-build.log
+      - name: Launch simulator and capture home
+        shell: bash
+        run: |
+          set -euo pipefail
           simulator_id=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for group in d["devices"].values() for x in group if "iPhone" in x["name"]))')
+          echo "SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
           xcrun simctl boot "$simulator_id"
           xcrun simctl bootstatus "$simulator_id" -b
           xcrun simctl install "$simulator_id" simulator-build/Build/Products/Debug-iphonesimulator/Zhixu.app
           xcrun simctl launch "$simulator_id" com.manyu2006131.zhixu | tee artifacts/simulator-launch.log
           sleep 3
           xcrun simctl io "$simulator_id" screenshot artifacts/home.png
+      - name: Test daily workflow and persistence
+        shell: bash
+        run: |
+          set -euo pipefail
           xcodebuild -project Zhixu.xcodeproj -scheme Zhixu \
-            -configuration Debug -destination "platform=iOS Simulator,id=$simulator_id" \
+            -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -parallel-testing-enabled NO \
             -derivedDataPath simulator-build -resultBundlePath artifacts/UITests.xcresult \
             CODE_SIGNING_ALLOWED=NO test 2>&1 | tee artifacts/ui-tests.log
-          xcrun simctl shutdown "$simulator_id"
+      - name: Shut down simulator
+        if: always() && env.SIMULATOR_ID != ''
+        run: xcrun simctl shutdown "$SIMULATOR_ID" || true
       - name: Upload IPA and logs
         if: always()
         uses: actions/upload-artifact@v7.0.2
