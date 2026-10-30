@@ -669,7 +669,7 @@ struct EntriesView: View {
             Section { Text(kind.hint).font(.footnote).foregroundStyle(.secondary) }
             if kind == .body, let latest = items.first {
                 Section("最近记录") {
-                    Metric(title: latest.date.formatted(date: .abbreviated, time: .omitted), value: "\(latest.amount, specifier: "%.1f") kg · \(latest.goal, specifier: "%.1f") cm")
+                    Metric(title: latest.date.formatted(date: .abbreviated, time: .omitted), value: String(format: "%.1f kg · %.1f cm", latest.amount, latest.goal))
                     if items.count > 1, let first = items.last { Text("与首条记录相比：体重 \(latest.amount - first.amount, specifier: "%+.1f") kg，腰围 \(latest.goal - first.goal, specifier: "%+.1f") cm").font(.caption) }
                 }
             }

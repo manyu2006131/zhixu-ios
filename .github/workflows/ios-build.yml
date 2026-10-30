@@ -70,6 +70,7 @@ jobs:
           xcrun simctl bootstatus "$simulator_id" -b
           xcrun simctl install "$simulator_id" simulator-build/Build/Products/Debug-iphonesimulator/Zhixu.app
           xcrun simctl launch "$simulator_id" com.manyu2006131.zhixu | tee artifacts/simulator-launch.log
+          sleep 3
           xcrun simctl io "$simulator_id" screenshot artifacts/home.png
           xcodebuild -project Zhixu.xcodeproj -scheme Zhixu \
             -configuration Debug -destination "platform=iOS Simulator,id=$simulator_id" \
